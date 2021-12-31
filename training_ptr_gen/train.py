@@ -17,6 +17,9 @@ from data_util.data import Vocab
 from data_util.utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
 class Train(object):
@@ -49,8 +52,10 @@ class Train(object):
         torch.save(state, model_save_path)
 
     def setup_train(self, model_file_path=None):
+        print('TRAINING SETUP ON {}.'.format('CUDA' if use_cuda else 'CPU'))
         self.model = Model(model_file_path)
 
+        print('MODEL INITIALIZED SUCCESSFULLY.')
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
                  list(self.model.reduce_state.parameters())
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
@@ -71,6 +76,7 @@ class Train(object):
                             if torch.is_tensor(v):
                                 state[k] = v.cuda()
 
+        print('TRAINING SETUP IS DONE.')
         return start_iter, start_loss
 
     def train_one_batch(self, batch):
@@ -127,20 +133,19 @@ class Train(object):
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
-            if iter % 100 == 0:
+            if iter % config.print_interval == 0:
                 self.summary_writer.flush()
-            print_interval = 1000
-            if iter % print_interval == 0:
-                print('steps %d, seconds for %d batch: %.2f , loss: %f' % (iter, print_interval,
-                                                                           time.time() - start, loss))
+                print('Steps {} of {} = {:.0f}%. Elapsed time = {:.0f} seconds. Loss = {:.4f}. Avg Loss = {:.4f}.'.format(
+                    iter, n_iters, iter*100/n_iters, time.time() - start, loss, running_avg_loss))
                 start = time.time()
-            if iter % 5000 == 0:
+            if iter % (config.print_interval*5) == 0:
                 self.save_model(running_avg_loss, iter)
+                print('MODEL SAVED.')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train script")
     parser.add_argument("-m",
-                        dest="model_file_path", 
+                        dest="model_file_path",
                         required=False,
                         default=None,
                         help="Model file for retraining (default: None).")

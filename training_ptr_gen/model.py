@@ -7,6 +7,9 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from data_util import config
 from numpy import random
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
 random.seed(123)

@@ -15,6 +15,9 @@ from data_util.utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
 from model import Model
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
 class Evaluate(object):
@@ -75,12 +78,10 @@ class Evaluate(object):
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
-            if iter % 100 == 0:
+            if iter % config.print_interval == 0:
                 self.summary_writer.flush()
-            print_interval = 1000
-            if iter % print_interval == 0:
-                print('steps %d, seconds for %d batch: %.2f , loss: %f' % (
-                iter, print_interval, time.time() - start, running_avg_loss))
+                print('Steps {}. Elapsed time = {:.0f} seconds. Loss = {:.4f}. Avg Loss = {:.4f}.'.format(
+                    iter, time.time() - start, loss, running_avg_loss))
                 start = time.time()
             batch = self.batcher.next_batch()
 

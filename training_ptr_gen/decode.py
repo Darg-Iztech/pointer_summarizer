@@ -20,6 +20,8 @@ from model import Model
 from data_util.utils import write_for_rouge, rouge_eval, rouge_log
 from train_util import get_input_from_batch
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
@@ -93,8 +95,8 @@ class BeamSearch(object):
             write_for_rouge(original_abstract_sents, decoded_words, counter,
                             self._rouge_ref_dir, self._rouge_dec_dir)
             counter += 1
-            if counter % 1000 == 0:
-                print('%d example in %d sec'%(counter, time.time() - start))
+            if counter % config.print_interval == 0:
+                print('Examples %d-%d decoded in %d sec'%(counter-config.print_interval, counter, time.time() - start))
                 start = time.time()
 
             batch = self.batcher.next_batch()

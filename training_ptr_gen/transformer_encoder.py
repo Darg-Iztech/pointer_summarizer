@@ -8,6 +8,9 @@ import torch.nn.functional as F
 import logging
 import math
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 logging.basicConfig(level=logging.INFO)
 
 class PositionalEncoding(nn.Module):

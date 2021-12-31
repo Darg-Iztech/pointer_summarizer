@@ -49,20 +49,35 @@ rouge_l_precision: 0.3231 with confidence interval (0.3205, 0.3256)
 ```
 ![Alt text](learning_curve.png?raw=true "Learning Curve with pointer generation")
 
+## Create and activate virtual environment
+
+```bash
+conda create --name pointer_env --file requirements.txt
+conda activate pointer_env
+```
+
+:warning: Includes ``python 2.7``, ``pytorch 0.4.1``, ``tensorflow 1.2.1``, and other required packages.
 
 ## How to run training:
-1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail
-2) Run start_train.sh, you might need to change some path and parameters in data_util/config.py
-3) For training run start_train.sh, for decoding run start_decode.sh, and for evaluating run run_eval.sh
 
-Note:
+1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail
+2) Run ``start_train.sh``, you might need to change some path and parameters in ``data_util/config.py``.
+3) For training run ``start_train.sh``, for decoding run ``start_decode.sh``, and for evaluating run ``run_eval.sh``.
+
+**Note:**
 
 * In decode mode beam search batch should have only one example replicated to batch size
 https://github.com/atulkum/pointer_summarizer/blob/master/training_ptr_gen/decode.py#L109
 https://github.com/atulkum/pointer_summarizer/blob/master/data_util/batcher.py#L226
 
-* It is tested on pytorch 0.4 with python 2.7
 * You need to setup [pyrouge](https://github.com/andersjo/pyrouge) to get the rouge score
+
+```bash
+git clone https://github.com/andersjo/pyrouge
+cd pyrouge
+echo 'from __future__ import print_function' | cat - pyrouge/rouge.py > temp && mv temp pyrouge/rouge.py
+python setup.py install
+```
 
 ## Papers using this code:
 1) [Automatic Program Synthesis of Long Programs with a Learned Garbage Collector](http://papers.nips.cc/paper/7479-automatic-program-synthesis-of-long-programs-with-a-learned-garbage-collector) ***NeuroIPS 2018*** https://github.com/amitz25/PCCoder
