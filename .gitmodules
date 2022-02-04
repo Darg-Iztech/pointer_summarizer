@@ -1,3 +1,6 @@
 [submodule "rouge"]
 	path = rouge
 	url = https://github.com/Darg-Iztech/rouge
+[submodule "quote-detection"]
+	path = quote-detection
+	url = https://github.com/Darg-Iztech/quote-detection
