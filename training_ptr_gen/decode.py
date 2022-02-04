@@ -9,15 +9,21 @@ sys.setdefaultencoding('utf8')
 
 import os
 import time
+import argparse
+from datetime import datetime
 
 import torch
 from torch.autograd import Variable
+
+import pandas as pd
+from tqdm import tqdm
+from rouge import Rouge
 
 from data_util.batcher import Batcher
 from data_util.data import Vocab
 from data_util import data, config
 from model import Model
-from data_util.utils import write_for_rouge, rouge_eval, rouge_log
+from data_util.utils import write_for_rouge
 from train_util import get_input_from_batch
 
 import warnings
@@ -50,18 +56,18 @@ class Beam(object):
 
 
 class BeamSearch(object):
-    def __init__(self, model_file_path):
-        model_name = os.path.basename(model_file_path)
-        self._decode_dir = os.path.join(config.log_root, 'decode_%s' % (model_name))
+    def __init__(self, model_file_path, data_folder, log_file_id):
+        # model_name = os.path.basename(model_file_path)
+        self._decode_dir = os.path.join(config.log_root, 'decode_%s' % (log_file_id))
         self._rouge_ref_dir = os.path.join(self._decode_dir, 'rouge_ref')
         self._rouge_dec_dir = os.path.join(self._decode_dir, 'rouge_dec_dir')
         for p in [self._decode_dir, self._rouge_ref_dir, self._rouge_dec_dir]:
             if not os.path.exists(p):
                 os.mkdir(p)
 
-        self.vocab = Vocab(config.vocab_path, config.vocab_size)
-        self.batcher = Batcher(config.decode_data_path, self.vocab, mode='decode',
-                               batch_size=config.beam_size, single_pass=True)
+        dp = config.get_data_paths(data_folder)
+        self.vocab = Vocab(dp['vocab'], config.vocab_size)
+        self.batcher = Batcher(dp['decode'], self.vocab, mode='decode', batch_size=config.beam_size, single_pass=True)
         time.sleep(15)
 
         self.model = Model(model_file_path, is_eval=True)
@@ -70,7 +76,7 @@ class BeamSearch(object):
         return sorted(beams, key=lambda h: h.avg_log_prob, reverse=True)
 
 
-    def decode(self):
+    def decode(self, log_file_id):
         start = time.time()
         counter = 0
         batch = self.batcher.next_batch()
@@ -101,10 +107,10 @@ class BeamSearch(object):
 
             batch = self.batcher.next_batch()
 
-        print("Decoder has finished reading dataset for single_pass.")
+        print("Decoder has finished reading dataset for single pass.")
         print("Now starting ROUGE eval...")
-        results_dict = rouge_eval(self._rouge_ref_dir, self._rouge_dec_dir)
-        rouge_log(results_dict, self._decode_dir)
+        rouge_1_df, rouge_2_df, rouge_l_df = self.rouge_eval(self._rouge_dec_dir, self._rouge_ref_dir)
+        self.rouge_save(log_file_id, rouge_1_df, rouge_2_df, rouge_l_df)
 
 
     def beam_search(self, batch):
@@ -125,7 +131,7 @@ class BeamSearch(object):
                       state=(dec_h[0], dec_c[0]),
                       context = c_t_0[0],
                       coverage=(coverage_t_0[0] if config.is_coverage else None))
-                 for _ in xrange(config.beam_size)]
+                 for _ in range(config.beam_size)]
         results = []
         steps = 0
         while steps < config.max_dec_steps and len(results) < config.beam_size:
@@ -169,13 +175,13 @@ class BeamSearch(object):
 
             all_beams = []
             num_orig_beams = 1 if steps == 0 else len(beams)
-            for i in xrange(num_orig_beams):
+            for i in range(num_orig_beams):
                 h = beams[i]
                 state_i = (dec_h[i], dec_c[i])
                 context_i = c_t[i]
                 coverage_i = (coverage_t[i] if config.is_coverage else None)
 
-                for j in xrange(config.beam_size * 2):  # for each of the top 2*beam_size hyps:
+                for j in range(config.beam_size * 2):  # for each of the top 2*beam_size hyps:
                     new_beam = h.extend(token=topk_ids[i, j].item(),
                                    log_prob=topk_log_probs[i, j].item(),
                                    state=state_i,
@@ -202,9 +208,79 @@ class BeamSearch(object):
 
         return beams_sorted[0]
 
+    def rouge_eval(self, decoded_dir, ref_dir):
+        rouge = Rouge()
+        columns=['F1','Recall','Precision']
+        rouge_l_df = pd.DataFrame(columns=columns)
+        rouge_1_df = pd.DataFrame(columns=columns)
+        rouge_2_df = pd.DataFrame(columns=columns)
+
+        not_found_list = []
+        file_count = len(os.listdir(ref_dir))
+        print('Rouge Evaluation started for {} files..'.format(file_count))
+        for i in tqdm (range(file_count), desc='Running'):
+            index = str(i).zfill(6)
+            dec_file = decoded_dir + "/" + index + '_decoded.txt'
+            ref_file = ref_dir + "/" + index + '_reference.txt'
+            if os.path.isfile(dec_file) and os.path.isfile(ref_file):
+                with open(dec_file, 'r') as file:
+                    decoded = file.read().rstrip().decode("utf8")
+
+                with open(ref_file, 'r') as file:
+                    reference = file.read().rstrip().decode("utf8")
+                
+                score = rouge.get_scores(decoded, reference)[0]
+                rouge_l_df.loc[i] = [score['rouge-l']['f'], score['rouge-l']['r'], score['rouge-l']['p']]
+                rouge_1_df.loc[i] = [score['rouge-1']['f'], score['rouge-1']['r'], score['rouge-1']['p']]
+                rouge_2_df.loc[i] = [score['rouge-2']['f'], score['rouge-2']['r'], score['rouge-2']['p']]
+            else:
+                not_found_list.append((dec_file, ref_file))
+        if len(not_found_list) != 0:
+            print('{} files could not be identified.'.format(len(not_found_list)))
+            #print(not_found_list)
+        print('Evaluation Finished..')
+        return [rouge_1_df, rouge_2_df, rouge_l_df]
+
+
+    def rouge_save(self, save_dir, rouge_1_df, rouge_2_df, rouge_l_df):
+        save_dir = "logs/decode_"+save_dir
+        if not os.path.exists(save_dir+'/rouge_scores/'):
+            os.makedirs(save_dir+'/rouge_scores/')
+        rouge_l_df.to_csv(save_dir+'/rouge_scores/rouge_l.csv')
+        rouge_1_df.to_csv(save_dir+'/rouge_scores/rouge_1.csv')
+        rouge_2_df.to_csv(save_dir+'/rouge_scores/rouge_2.csv')
+        print('Rouge scores saved..')
+
+        with open(save_dir+'/rouge_scores/summary.txt', 'w') as f:
+            for df, rouge in zip([rouge_1_df, rouge_2_df,rouge_l_df], ['ROUGE-1','ROUGE-2','ROUGE-L']):
+                print(rouge)
+                f.write(rouge+"\n")
+                for metric in rouge_l_df.columns:
+                    line = "{} Mean {}".format(round(df[metric].mean(),4), metric)
+                    print(line)
+                    f.write(line+"\n")
+
 if __name__ == '__main__':
-    model_filename = sys.argv[1]
-    beam_Search_processor = BeamSearch(model_filename)
-    beam_Search_processor.decode()
+    parser = argparse.ArgumentParser(description="Decode script")
+    parser.add_argument("-m",
+                        dest="model_file_path",
+                        required=False,
+                        default=None,
+                        help="Model file for retraining (default: None).")
+    parser.add_argument("-d",
+                        dest="data_folder",
+                        required=True,
+                        default=None,
+                        help="Dataset name 'quote' or 'cnn' (default: None).")
+    parser.add_argument("-l",
+                        dest="log_file_id",
+                        required=False,
+                        default=datetime.now().strftime("%Y%m%d_%H%M%S"),
+                        help="Postfix for decode log file (default: date_time).")
+    args = parser.parse_args()
+
+
+    beam_Search_processor = BeamSearch(args.model_file_path, args.data_folder, args.log_file_id)
+    beam_Search_processor.decode(args.log_file_id)
 
 

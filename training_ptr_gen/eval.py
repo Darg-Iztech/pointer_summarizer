@@ -6,6 +6,8 @@ import sys
 
 import tensorflow as tf
 import torch
+import argparse
+from datetime import datetime
 
 from data_util import config
 from data_util.batcher import Batcher
@@ -21,14 +23,14 @@ warnings.filterwarnings("ignore", category=UserWarning)
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
 class Evaluate(object):
-    def __init__(self, model_file_path):
-        self.vocab = Vocab(config.vocab_path, config.vocab_size)
-        self.batcher = Batcher(config.eval_data_path, self.vocab, mode='eval',
-                               batch_size=config.batch_size, single_pass=True)
+    def __init__(self, model_file_path, data_folder, log_file_id):
+        dp = config.get_data_paths(data_folder)
+        self.vocab = Vocab(dp['vocab'], config.vocab_size)
+        self.batcher = Batcher(dp['eval'], self.vocab, mode='eval', batch_size=config.batch_size, single_pass=True)
         time.sleep(15)
         model_name = os.path.basename(model_file_path)
 
-        eval_dir = os.path.join(config.log_root, 'eval_%s' % (model_name))
+        eval_dir = os.path.join(config.log_root, 'eval_%s' % (log_file_id))
         if not os.path.exists(eval_dir):
             os.mkdir(eval_dir)
         self.summary_writer = tf.summary.FileWriter(eval_dir)
@@ -87,8 +89,24 @@ class Evaluate(object):
 
 
 if __name__ == '__main__':
-    model_filename = sys.argv[1]
-    eval_processor = Evaluate(model_filename)
+    parser = argparse.ArgumentParser(description="Decode script")
+    parser.add_argument("-m",
+                        dest="model_file_path",
+                        required=False,
+                        default=None,
+                        help="Model file for retraining (default: None).")
+    parser.add_argument("-d",
+                        dest="data_folder",
+                        required=True,
+                        default=None,
+                        help="Dataset name 'quote' or 'cnn' (default: None).")
+    parser.add_argument("-l",
+                    dest="log_file_id",
+                    required=False,
+                    default=datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    help="Postfix for decode log file (default: date_time).")
+    args = parser.parse_args()
+    eval_processor = Evaluate(args.model_file_path, args.data_folder, args.log_file_id)
     eval_processor.run_eval()
 
 

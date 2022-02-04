@@ -134,3 +134,4 @@ logs/
 *.jar
 *.pyc
 *.bin
+index*.txt

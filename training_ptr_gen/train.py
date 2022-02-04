@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function, division
 import os
 import time
 import argparse
+from datetime import datetime
 
 import tensorflow as tf
 import torch
@@ -23,13 +24,14 @@ warnings.filterwarnings("ignore", category=UserWarning)
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
 class Train(object):
-    def __init__(self):
-        self.vocab = Vocab(config.vocab_path, config.vocab_size)
-        self.batcher = Batcher(config.train_data_path, self.vocab, mode='train',
-                               batch_size=config.batch_size, single_pass=False)
+    def __init__(self, data_folder, is_chunked, log_file_id):
+        dp = config.get_data_paths(data_folder)
+        self.vocab = Vocab(dp['vocab'], config.vocab_size)
+        self.batcher = Batcher(dp['chunked_train'] if is_chunked else dp['train'],
+                               self.vocab, mode='train', batch_size=config.batch_size, single_pass=False)
         time.sleep(15)
 
-        train_dir = os.path.join(config.log_root, 'train_%d' % (int(time.time())))
+        train_dir = os.path.join(config.log_root, 'train_%d' % (log_file_id))
         if not os.path.exists(train_dir):
             os.mkdir(train_dir)
 
@@ -135,10 +137,10 @@ class Train(object):
 
             if iter % config.print_interval == 0:
                 self.summary_writer.flush()
-                print('Steps {} of {} = {:.0f}%. Elapsed time = {:.0f} seconds. Loss = {:.4f}. Avg Loss = {:.4f}.'.format(
+                print('Steps {} of {} = {:.2f}%. Elapsed time = {:.0f} seconds. Loss = {:.4f}. Avg Loss = {:.4f}.'.format(
                     iter, n_iters, iter*100/n_iters, time.time() - start, loss, running_avg_loss))
                 start = time.time()
-            if iter % (config.print_interval*5) == 0:
+            if iter % (config.save_interval) == 0:
                 self.save_model(running_avg_loss, iter)
                 print('MODEL SAVED.')
 
@@ -149,7 +151,16 @@ if __name__ == '__main__':
                         required=False,
                         default=None,
                         help="Model file for retraining (default: None).")
+    parser.add_argument("-c",
+                        dest="is_chunked",
+                        action="store_true",
+                        help="Set to use chunked train data (default: True)")
+    parser.add_argument("-l",
+                    dest="log_file_id",
+                    required=False,
+                    default=datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    help="Postfix for decode log file (default: date_time).")
     args = parser.parse_args()
     
-    train_processor = Train()
+    train_processor = Train(args.data_folder, args.is_chunked, args.log_file_id)
     train_processor.trainIters(config.max_iterations, args.model_file_path)
