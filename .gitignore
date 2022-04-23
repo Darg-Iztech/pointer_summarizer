@@ -135,3 +135,5 @@ logs/
 *.pyc
 *.bin
 index*.txt
+**/*.txt
+**/vocab

@@ -9,9 +9,9 @@ import random
 import tensorflow as tf
 from tensorflow.core.example import example_pb2
 
-train_part = 0
-val_part = 0
-test_part = 1
+train_part = 0.7
+val_part = 0.1
+test_part = 0.2
 
 random.seed(42)
 

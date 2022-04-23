@@ -31,7 +31,7 @@ class Train(object):
                                self.vocab, mode='train', batch_size=config.batch_size, single_pass=False)
         time.sleep(15)
 
-        train_dir = os.path.join(config.log_root, 'train_%d' % (log_file_id))
+        train_dir = os.path.join(config.log_root, 'train_%s' % (log_file_id))
         if not os.path.exists(train_dir):
             os.mkdir(train_dir)
 
@@ -126,7 +126,8 @@ class Train(object):
         return loss.item()
 
     def trainIters(self, n_iters, model_file_path=None):
-        iter, running_avg_loss = self.setup_train(model_file_path)
+        iter = 0
+        prev_iter, running_avg_loss = self.setup_train(model_file_path)
         start = time.time()
         while iter < n_iters:
             batch = self.batcher.next_batch()
@@ -138,14 +139,19 @@ class Train(object):
             if iter % config.print_interval == 0:
                 self.summary_writer.flush()
                 print('Steps {} of {} = {:.2f}%. Elapsed time = {:.0f} seconds. Loss = {:.4f}. Avg Loss = {:.4f}.'.format(
-                    iter, n_iters, iter*100/n_iters, time.time() - start, loss, running_avg_loss))
+                    prev_iter + iter, prev_iter + n_iters, iter*100/n_iters, time.time() - start, loss, running_avg_loss))
                 start = time.time()
             if iter % (config.save_interval) == 0:
-                self.save_model(running_avg_loss, iter)
+                self.save_model(running_avg_loss, prev_iter + iter)
                 print('MODEL SAVED.')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train script")
+    parser.add_argument("-d",
+                    dest="data_folder",
+                    required=True,
+                    default=None,
+                    help="Dataset name 'quote' or 'cnn' (default: None).")
     parser.add_argument("-m",
                         dest="model_file_path",
                         required=False,
