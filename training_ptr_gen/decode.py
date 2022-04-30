@@ -229,6 +229,9 @@ class BeamSearch(object):
                 with open(ref_file, 'r') as file:
                     reference = file.read().rstrip().decode("utf8")
                 
+                # If somehow reference file is empty (a rare case bug, cause of which is undetected) put a placeholder.
+                if reference == '':
+                    reference = '[Input can not be found]' 
                 score = rouge.get_scores(decoded, reference)[0]
                 rouge_l_df.loc[i] = [score['rouge-l']['f'], score['rouge-l']['r'], score['rouge-l']['p']]
                 rouge_1_df.loc[i] = [score['rouge-1']['f'], score['rouge-1']['r'], score['rouge-1']['p']]
@@ -271,7 +274,7 @@ if __name__ == '__main__':
                         dest="data_folder",
                         required=True,
                         default=None,
-                        help="Dataset name 'quote' or 'cnn' (default: None).")
+                        help="Dataset name 'data_T50', 'cnn' or 'movie_quotes' (default: None).")
     parser.add_argument("-l",
                         dest="log_file_id",
                         required=False,
@@ -282,5 +285,8 @@ if __name__ == '__main__':
 
     beam_Search_processor = BeamSearch(args.model_file_path, args.data_folder, args.log_file_id)
     beam_Search_processor.decode(args.log_file_id)
+    
+    # rouge_1_df, rouge_2_df, rouge_l_df = beam_Search_processor.rouge_eval(beam_Search_processor._rouge_dec_dir, beam_Search_processor._rouge_ref_dir)
+    # beam_Search_processor.rouge_save(args.log_file_id, rouge_1_df, rouge_2_df, rouge_l_df)
 
 
