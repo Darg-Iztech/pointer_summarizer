@@ -3,18 +3,19 @@ import csv
 import config
 import random
 import argparse
+import pandas as pd
 
 # Returns a number of reference and decoded text pairs along with scores from specified data.
 parser = argparse.ArgumentParser()
 parser.add_argument("-d",
                 dest="data_name",
                 required=False,
-                default="data_T50",
+                default="T50_T50",
                 help="Dataset name which examples to be fetched.")
 parser.add_argument("-n",
                 dest="num_examples",
                 required=False,
-                default=3,
+                default=1000,
                 help="Number of examples to be fetched.")
 args = parser.parse_args()
 
@@ -27,6 +28,7 @@ scores_dir = os.path.join(log_name, "rouge_scores")
 file_count = len(os.listdir(ref_dir))
 random_ids = random.sample(range(0,file_count), int(args.num_examples))
 
+examples_df = pd.DataFrame(columns=['doc_id','reference', 'decoded', 'R1', 'R2', 'RL' ])
 for i, id in enumerate(random_ids):
     # Read the reference text
     file_name = str(id).zfill(6) + "_reference.txt"
@@ -51,12 +53,19 @@ for i, id in enumerate(random_ids):
                     score_list.append(round(float(row[1]),4))
                     break
 
+    examples_df.loc[i] = [str(id).zfill(6), ref_text, dec_text, score_list[0], score_list[1], score_list[2]]
 
-    print("\nFile: {} - F1 scores of-> Rouge1:{}, Rouge2: {}, RougeL: {}".format(str(id).zfill(6),
-        score_list[0], score_list[1], score_list[2]
+for id in ['000325']:
+    check = list(examples_df[examples_df['doc_id'] == id].reference)[0]
+    print(check)
+"""examples_df = examples_df.sort_values(by='R1').reset_index(drop=True)
+
+for i in range(examples_df.shape[0]):
+    print("\nFile: {} - F1 scores of-> Rouge1:{}, Rouge2: {}, RougeL: {}".format(examples_df.loc[i]['doc_id'],
+        examples_df.loc[i]['R1'], examples_df.loc[i]['R2'], examples_df.loc[i]['RL']
         ))
     print("--------------- REFERENCE ---------------")
-    print(ref_text)
+    print(examples_df.loc[i]['reference'])
     print("--------------- DECODED ---------------")
-    print(dec_text)
-    print("---------------------------------------\n")
+    print(examples_df.loc[i]['decoded'])
+    print("---------------------------------------\n")"""
