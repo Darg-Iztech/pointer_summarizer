@@ -3,7 +3,9 @@ pytorch implementation of *[Get To The Point: Summarization with Pointer-Generat
 1. [Train with pointer generation and coverage loss enabled](#train-with-pointer-generation-and-coverage-loss-enabled)
 2. [Training with pointer generation enabled](#training-with-pointer-generation-enabled)
 3. [How to run training](#how-to-run-training)
-4. [Papers using this code](#papers-using-this-code)
+4. [Preprocess the data](#preprocess-the-data)
+5. [Decode](#decode)
+6. [Papers using this code](#papers-using-this-code)
 
 
 ## Train with pointer generation and coverage loss enabled 
@@ -78,6 +80,36 @@ cd pyrouge
 echo 'from __future__ import print_function' | cat - pyrouge/rouge.py > temp && mv temp pyrouge/rouge.py
 python setup.py install
 ```
+
+## Preprocess the data
+
+Run the ``data_util/preprocess.py`` as:
+
+```bash
+python preprocess.py <input_dir> <output_dir>
+```
+
+**Note:**
+
+This will create:
+* Data partition files as ``all_test.txt``, ``all_train.txt``, ``all_val.txt`` containing input file names
+
+* Data files as ``test.bin``, ``train.bin``, ``val.bin`` for those partitions
+
+* Tokenized version of the data in input_tokenized_dir/
+
+* Chunked version of the .bin files inside chunked/
+
+## Decode
+
+Run the ``start_decode.sh`` as:
+
+```bash
+start_decode.sh <model_dir> <input_data_dir> <out_dir>
+```
+
+**Note:**
+This will output decoded results and rouge scores inside the given directory.
 
 ## Papers using this code:
 1) [Automatic Program Synthesis of Long Programs with a Learned Garbage Collector](http://papers.nips.cc/paper/7479-automatic-program-synthesis-of-long-programs-with-a-learned-garbage-collector) ***NeuroIPS 2018*** https://github.com/amitz25/PCCoder
